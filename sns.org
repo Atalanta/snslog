@@ -90,7 +90,30 @@ ok so this all works... and the service is running.  But we need it to be in che
 OK, in Chef and pushed.
 * Thu 19 Mar 09:12:20 GMT 2015
 ** SNS Log
-Maintaining a log is a good idea.  But let's ensure it's in git, so I can get at it any time.
+Maintaining a log is a good idea.  But let's ensure it's in git, so I can get at it any time:
+
+#+BEGIN_QUOTE
+sns@bosch:~/doc$ cd sns/
+sns@bosch:~/doc/sns$ ls
+sns.org
+sns@bosch:~/doc/sns$ git init
+Initialized empty Git repository in /home/sns/doc/sns/.git/
+sns@bosch:~/doc/sns$ git add sns.org 
+sns@bosch:~/doc/sns$ git commit -m 'SNS Log'
+[master (root-commit) 0611a8d] SNS Log
+ 1 file changed, 134 insertions(+)
+ create mode 100644 sns.org
+sns@bosch:~/doc/sns$ git remote add origin git@github.com:Atalanta/snslog.git
+sns@bosch:~/doc/sns$ git push -u origin master
+Counting objects: 3, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 2.08 KiB | 0 bytes/s, done.
+Total 3 (delta 0), reused 0 (delta 0)
+To git@github.com:Atalanta/snslog.git
+ * [new branch]      master -> master
+Branch master set up to track remote branch master from origin.
+#+END_QUOTE
 ** Pound follow up
 Pound has been installed on the main firewall:
 
