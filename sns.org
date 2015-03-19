@@ -320,6 +320,19 @@ the effect of pushing out changes from an earlier version.
 
 Lesson: ensure you push your environments!
 
+Thoughts from Jon:
+
+#+BEGIN_SRC 
+13:35 <Cope> https://gist.github.com/Atalanta/5b067ad755a2e79acd6d
+13:36 <jonlives> the short version for how we catch that is https://github.com/bmarini/knife-inspect, run as a jenkins job on every git push
+13:41 <Cope> so jenkins watches git
+13:41 <Cope> and runs knife-inspect
+13:41 <Cope> and bitches out
+13:42 <jonlives> if anything is out of sync
+13:42 <jonlives> which includes constraints etc
+13:42 <Cope> so it won't stop the push, but it will warn us that it is wrong
+13:42 <jonlives> yeah
+#+END_SRC
 ** Test Kitchen for OpenBSD and SmartOS
 NT has implemented some of this... need to find out how much.
 Specifically I am thinking of the fact that the firewall is using the
