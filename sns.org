@@ -1,0 +1,134 @@
+* Wed 18 Mar 18:39:45 GMT 2015
+** Pound
+Right, I'm going to fucking well this working and working properly, a
+step at a time.  First:  install pound:
+
+pkg_add pound
+
+Now, let's empty the config file.
+
+
+-bash-4.3# > /etc/pound.cfg
+-bash-4.3# pound
+starting...
+no listeners defined - aborted
+
+Great, so we need some listeners.  They can be HTTP or HTTPS.  Let's start with an HTTP one.
+
+They need an address and a port.  The address is just localhost, and the port can be 8080.
+
+This is enough for pound to start:
+
+# telnet localhost 8080
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+get / http/1.1
+
+HTTP/1.0 503 Service Unavailable
+Content-Type: text/html
+Content-Length: 53
+Expires: now
+Pragma: no-cache
+Cache-control: no-cache,no-store
+
+The service is not available. Please try again later.Connection closed by foreign host.
+
+Fairly obviously, pound doesn't know what to do with requests.  Let's
+fix that.  For this we need a service.  Services can either be global
+or tied to listeners.  For now let's make it global.
+
+Now, services need backends.  Again, the simplest thing possible would be to pass everything to one machine.
+
+This works:
+
+-bash-4.3# telnet localhost 8080
+Trying 127.0.0.1...
+Connected to localhost.
+Escape character is '^]'.
+get / http/1.1
+
+HTTP/1.1 400 Bad Request
+Date: Wed, 18 Mar 2015 19:11:26 GMT
+Server: Apache/2.4.7 (Ubuntu)
+Content-Length: 320
+Connection: close
+Content-Type: text/html; charset=iso-8859-1
+
+<!DOCTYPE HTML PUBLIC "-//IETF//DTD HTML 2.0//EN">
+<html><head>
+<title>400 Bad Request</title>
+</head><body>
+<h1>Bad Request</h1>
+<p>Your browser sent a request that this server could not understand.<br />
+</p>
+<hr>
+<address>Apache/2.4.7 (Ubuntu) Server at l0001.rs.uk.livelinkprint.com Port 80</address>
+</body></html>
+Connection closed by foreign host.
+
+Now, let's make it a bit more complicated.
+
+Let's have two services, one for costcophoto.co.uk, and one for lift.livelinkprint.com.  OK that works... (be careful with spaces)
+
+OK, next, can we have multiple matches per service, so we can pass in for, eg, s28 and s29 domains?  No.  We need a service per host.
+
+Right, this all seems to work.  The next challenge is an HTTPS listener.
+
+So, for this we need to add a listener and cert.
+
+The cert needs all three in one:
+
+
+
+-bash-4.3# cat livelinkprint.com.key livelinkprint.com.crt livelinkprint.com.crt2 > livelinkprint.com.pem
+
+;
+
+ok so this all works... and the service is running.  But we need it to be in chef.
+
+OK, in Chef and pushed.
+* Thu 19 Mar 09:12:20 GMT 2015
+** SNS Log
+Maintaining a log is a good idea.  But let's ensure it's in git, so I can get at it any time.
+** Pound follow up
+Pound has been installed on the main firewall:
+
+#+BEGIN_QUOTE
+Host rsbastion
+  HostName 109.200.18.70
+  User sns
+  Port 3023
+IdentityFile ~/.ssh/id_dsa
+#+END_QUOTE
+
+Chef has been updated accordingly, and relayd switched off.  The
+firewall is now configured to redirect http and https traffic to
+localhost, wherefrom Pound sends it to the right places:
+
+#+BEGIN_QUOTE
+pass in quick on $ext_if proto tcp from any to $ext_if port http rdr-to 127.0.0.1
+pass in quick on $ext_if proto tcp from any to $ext_if port https rdr-to 127.0.0.1
+#+END_QUOTE
+
+Pound is running out of rc.d, but not monitored or supervised in
+anyway.  It would be a good idea to have the process watched using
+monit.
+
+Logs presently are in pound format, but there's an option to make them
+apache format which might be useful for analysis purposes.
+
+The logs are probably not being rotated, and there is no other monitoring on the box.
+
+Created ticket: https://livelinkinfraops.zendesk.com/agent/tickets/130 for log rotation.
+Created ticket: https://livelinkinfraops.zendesk.com/agent/tickets/131 for monitoring.
+
+Use of Relayd also isn't documented, which is largely a function of the wiki not being available.
+
+** FahyFoto R3 Site
+https://livelinkinfraops.zendesk.com/agent/tickets/124
+Not sure what the process is here, or what the deadline is.
+
+
+
+
