@@ -333,6 +333,38 @@ Thoughts from Jon:
 13:42 <Cope> so it won't stop the push, but it will warn us that it is wrong
 13:42 <jonlives> yeah
 #+END_SRC
+** Monit Process Supervision
+#+BEGIN_SRC 
+[root@28e8a2a4-7db4-ea0c-afeb-be0b963334f0 /opt/local/etc/monit]# grep -v ^# monitrc 
+set daemon  60              # check services at 1-minute intervals
+set mailserver localhost
+set alert sanelson@gmail.com not on { instance, action }
+set httpd port 2812 and
+    allow admin:monit      # require user 'admin' with password 'monit'
+    allow @monit           # allow users of group 'monit' to connect (rw)
+    allow @users readonly  # allow users of group 'users' to connect readonly
+
+
+check process thin with pidfile /root/mithrandir/tmp/pids/thin.pid
+    start program = "/opt/local/bin/thin -d -c /root/mithrandir start"
+    stop program = "/opt/local/bin/thin -c /root/mithrandir stop"
+#+END_SRC
+
+So monit needs to know:
+
+- what the process should be called
+- what the pid is
+- what the start program is
+- what the stop program is
+
+For thin, we'd want to have separate processes for each one, rather
+than start a cluster, as deriving the pids would be trickier.
+
+** Push after or before a promote --remote
+This is a discussion - we need to do one or the other.  I know Etsy
+have struggled with this.  They settled for after, because the server
+is the source of truth for the nodes, and git for the humans.
+
 ** Test Kitchen for OpenBSD and SmartOS
 NT has implemented some of this... need to find out how much.
 Specifically I am thinking of the fact that the firewall is using the
@@ -390,3 +422,42 @@ basis, but that he is thinking at a higher level - how would we do this is Chef?
 I mentioned Chef Provisioning as something to look at, but also felt
 that for much of the stuff simply using Chef search ought to be
 sufficient.
+** CyrusOne Call
+Spoke with Colleen this morning (her time).  She's working to get the
+paperwork ready into a signable bundle by tomorrow morning her time.
+From our side we simply need to decide if we're happy with the MSA and
+standard T&C.  I think we are, but I need to check with David.
+
+On my side, we need to agree the size of network we need, so we can
+justify IP addresses.
+
+Touch call again tomorrow at the same time.
+** Sentral Storage Discussion
+Had a call with Mike & Mike.  They say that they cannot get the 60
+drive machine until late April, which is less than ideal.  They
+suggest a 1U machine with the same spec and one or two 4U JBODs.
+These have:
+
+- 45 3.5 drives per chassis in a 4U enclosure
+- 4 ports out the back
+
+They also have one which takes 90, but this is 2 drives per hotswap,
+which would require some zpool thinking.
+
+The Mikes are going to get back to me with pricing ASAP.
+** Ganglia
+#+BEGIN_SRC 
+marking ganglia-webfrontend-3.1.2nb2 as non auto-removable
+[root@737e21f2-8f99-e8f9-ff4e-8a530796050e ~]# lynx http://localhost/ganglia/
+[root@737e21f2-8f99-e8f9-ff4e-8a530796050e ~]# ifconfig 
+lo0: flags=2001000849<UP,LOOPBACK,RUNNING,MULTICAST,IPv4,VIRTUAL> mtu 8232 index 1
+        inet 127.0.0.1 netmask ff000000 
+net0: flags=40201000843<UP,BROADCAST,RUNNING,MULTICAST,IPv4,CoS,L3PROTECT> mtu 1500 index 2
+        inet 10.128.2.6 netmask ffffff00 broadcast 10.128.2.255
+        ether 90:b8:d0:e2:ee:e2 
+lo0: flags=2002000849<UP,LOOPBACK,RUNNING,MULTICAST,IPv6,VIRTUAL> mtu 8252 index 1
+        inet6 ::1/128 
+[root@737e21f2-8f99-e8f9-ff4e-8a530796050e ~]# man svccfg
+[root@737e21f2-8f99-e8f9-ff4e-8a530796050e ~]# logout
+Connection to 10.128.2.6 closed.
+#+END_SRC
