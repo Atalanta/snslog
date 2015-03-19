@@ -1,24 +1,26 @@
 * Wed 18 Mar 18:39:45 GMT 2015
 ** Pound
-Right, I'm going to fucking well this working and working properly, a
-step at a time.  First:  install pound:
+Relayd isn't working well, so we need a replacement.
+Suggested/recommended Pound.
 
-pkg_add pound
+    pkg_add pound
 
 Now, let's empty the config file.
 
-
+#+BEGIN_SRC 
 -bash-4.3# > /etc/pound.cfg
 -bash-4.3# pound
 starting...
 no listeners defined - aborted
+#+END_SRC
 
-Great, so we need some listeners.  They can be HTTP or HTTPS.  Let's start with an HTTP one.
-
-They need an address and a port.  The address is just localhost, and the port can be 8080.
+Great, so we need some listeners.  They can be HTTP or HTTPS.  Let's
+start with an HTTP one.  Listeners need an address and a port.  The
+address is just localhost, and the port can be 8080.
 
 This is enough for pound to start:
 
+#+BEGIN_SRC 
 # telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
@@ -33,15 +35,18 @@ Pragma: no-cache
 Cache-control: no-cache,no-store
 
 The service is not available. Please try again later.Connection closed by foreign host.
+#+END_SRC
 
 Fairly obviously, pound doesn't know what to do with requests.  Let's
 fix that.  For this we need a service.  Services can either be global
 or tied to listeners.  For now let's make it global.
 
-Now, services need backends.  Again, the simplest thing possible would be to pass everything to one machine.
+Now, services need backends.  Again, the simplest thing possible would
+be to pass everything to one machine.
 
 This works:
 
+#+BEGIN_SRC 
 -bash-4.3# telnet localhost 8080
 Trying 127.0.0.1...
 Connected to localhost.
@@ -66,12 +71,18 @@ Content-Type: text/html; charset=iso-8859-1
 <address>Apache/2.4.7 (Ubuntu) Server at l0001.rs.uk.livelinkprint.com Port 80</address>
 </body></html>
 Connection closed by foreign host.
+#+END_SRC
+
 
 Now, let's make it a bit more complicated.
 
-Let's have two services, one for costcophoto.co.uk, and one for lift.livelinkprint.com.  OK that works... (be careful with spaces)
+Let's have two services, one for costcophoto.co.uk, and one for
+lift.livelinkprint.com.  OK that works... (be careful with spaces in
+vhost names - the space needs to be there to match Host:
+myhost.foo.com)
 
-OK, next, can we have multiple matches per service, so we can pass in for, eg, s28 and s29 domains?  No.  We need a service per host.
+OK, next, can we have multiple matches per service, so we can pass in
+for, eg, s28 and s29 domains?  No.  We need a service per host.
 
 Right, this all seems to work.  The next challenge is an HTTPS listener.
 
@@ -79,20 +90,21 @@ So, for this we need to add a listener and cert.
 
 The cert needs all three in one:
 
+    -bash-4.3# cat livelinkprint.com.key livelinkprint.com.crt livelinkprint.com.crt2 > livelinkprint.com.pem
 
+So with the HTTPS listener in place, everything works and is in Chef
+and the service is running.  But we need it to be in chef.
 
--bash-4.3# cat livelinkprint.com.key livelinkprint.com.crt livelinkprint.com.crt2 > livelinkprint.com.pem
-
-;
-
-ok so this all works... and the service is running.  But we need it to be in chef.
+Not all straightfoward in Chef as the package and service resources
+don't quite do the right thing, so I've botched it using execute
+resources.
 
 OK, in Chef and pushed.
 * Thu 19 Mar 09:12:20 GMT 2015
 ** SNS Log
 Maintaining a log is a good idea.  But let's ensure it's in git, so I can get at it any time:
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
 sns@bosch:~/doc$ cd sns/
 sns@bosch:~/doc/sns$ ls
 sns.org
@@ -113,7 +125,7 @@ Total 3 (delta 0), reused 0 (delta 0)
 To git@github.com:Atalanta/snslog.git
  * [new branch]      master -> master
 Branch master set up to track remote branch master from origin.
-#+END_QUOTE
+#+END_SRC
 ** Emacs Learnings
 - To prevent ido-mode from switching to a file/buffer that is already open (such as default.rb), use *ido-fix* (C-j)
 - To create src or quote blocks quickly, in org-mode, type in "<s" or "<q" and press TAB
