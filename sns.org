@@ -114,6 +114,9 @@ To git@github.com:Atalanta/snslog.git
  * [new branch]      master -> master
 Branch master set up to track remote branch master from origin.
 #+END_QUOTE
+** Emacs Learnings
+- To prevent ido-mode from switching to a file/buffer that is already open (such as default.rb), use *ido-fix* (C-j)
+- To create src or quote blocks quickly, in org-mode, type in "<s" or "<q" and press TAB
 ** Pound follow up
 Pound has been installed on the main firewall:
 
@@ -143,15 +146,216 @@ apache format which might be useful for analysis purposes.
 
 The logs are probably not being rotated, and there is no other monitoring on the box.
 
-Created ticket: https://livelinkinfraops.zendesk.com/agent/tickets/130 for log rotation.
-Created ticket: https://livelinkinfraops.zendesk.com/agent/tickets/131 for monitoring.
+Created ticket: https://livelinkinfraops.zendesk.wcom/agent/tickets/130
+for log rotation.  Created ticket:
+https://livelinkinfraops.zendesk.com/agent/tickets/131 for monitoring.
 
-Use of Relayd also isn't documented, which is largely a function of the wiki not being available.
+Use of Relayd also isn't documented, which is largely a function of
+the wiki not being available.
+** Wiki Unavailable
+Discussed with NT & SB.  Current status is that the wiki exists in so
+far as there's a git repo, but it is hard to use.  I'd already created
+a prototype wiki at 37.153.107.245.
 
+This used varnish to proxy to thin, and managed thin using monit:
+
+#+BEGIN_QUOTE
+[root@28e8a2a4-7db4-ea0c-afeb-be0b963334f0 ~]# cat /opt/local/etc/default.vcl 
+backend default {
+    .host = "127.0.0.1";
+    .port = "3000";
+}
+
+sub vcl_fetch {
+    if (beresp.status == 302 && beresp.http.location ~ "/create") { return (hit_for_pass); }  }
+#+END_QUOTE
+
+This is needed because when you create a site, there's a redirect, which gets cached.  Actually there are other problems with Varnish which are unresolved:
+
+#+BEGIN_QUOTE
+09:14 <Cope> Still have an oddity with my varnish / gollum setup... 
+09:15 <Cope> http://37.153.107.245:8080/Home
+09:15 <Cope> 1) Create a page & save
+09:15 <Cope> 2) Edit the page and save
+09:15 <Cope> When we visit the edit page we don't (always) see the latest version
+09:15 <Cope> and if we do
+09:16 <Cope> 3) When we edit it again, we see a cache of the last edit!
+09:16 <Cope> turns out caching is hard.
+09:37 <Mithrandir> either have it send out a purge on edit, or look at what it looks like when you edit, then purge the object for that url
+09:41 <Cope> what's the best way to see what is actually happening?
+09:41 <Mithrandir> I tend to just use the network viewer in chromium
+09:41 <Mithrandir> but wireshark works too
+#+END_QUOTE
+
+To run with thin, we just need a config.ru in the base of the directory we want to use.  Nick has augmented this to implement some authentication:
+
+#+BEGIN_SRC 
+__DIR__ = File.expand_path(File.dirname(__FILE__))
+$: << __DIR__
+require 'rubygems'
+require 'yaml'
+require 'app'
+App.set(:gollum_path, __DIR__)
+App.set(:authorized_users, YAML.load_file(File.expand_path('users.yml', __DIR__)))
+App.set(:wiki_options, {})
+run App 
+#+END_SRC
+
+This requires that we have an app.rb and a users.yml file too:
+
+#+BEGIN_SRC 
+require 'gollum/app'
+require 'digest/sha1'
+
+class App < Precious::App
+  User = Struct.new(:name, :email, :password_hash, :can_write)
+
+  before { authenticate! }
+  before /^\/(edit|create|delete|livepreview|revert)/ do authorize_write! ; end
+
+  helpers do
+    def authenticate!
+      @_auth ||=  Rack::Auth::Basic::Request.new(request.env)
+      if @_auth.provided?
+      end
+      if @_auth.provided? && @_auth.basic? && @_auth.credentials &&
+        @user = detected_user(@_auth.credentials)
+        return @user
+      else
+        response['WWW-Authenticate'] = %(Basic realm="Gollum Wiki")
+        throw(:halt, [401, "Not authorized\n"])
+      end
+    end
+
+    def authorize_write!
+      throw(:halt, [403, "Forbidden\n"]) unless @user.can_write
+    end
+
+    def users
+      @_users ||= settings.authorized_users.map {|u| User.new(*u) }
+    end
+
+    def detected_user(credentials)
+      users.detect do |u|
+        [u.email, u.password_hash] ==
+        [credentials[0], Digest::SHA1.hexdigest(credentials[1])]
+      end
+    end
+  end
+
+  def commit_message
+    {
+      :message => params[:message],
+      :name => @user.name,
+      :email => @user.email
+    }
+  end
+end
+#+END_SRC
+
+The users.yml looks like this:
+
+#+BEGIN_SRC 
+---
+- - Nick Trew
+  - n.trew@livelinktechnology.net
+  - e5e9fa1ba31ecd1ae84f75caaa474f3a663f05f4 # secret
+  - true 
+#+END_SRC
+
+So NT & SB and I talked about the hosting environment for the wiki.  I
+suggested continuing with thin, but with apache and mod_proxy_balancer
+in place of passenger.  SB pointed out that we do wish to keep things
+standard, but was open to trying an alternative, as long as we agreed
+to standardise.
+
+The requirement for authentication was also discussed.  I suggested
+using Basic Auth with Apache, but NT managed to find a way to do it in
+the application.  Either way, it works fine.  We just need to ensure
+we run it via https (using the wildcard certificate).
+
+We agreed that we'd like to run this in RedStation.
+
+Next steps:
+
+- Finish the monit supervision to run with multiple thin processes
+- Write an SMF manifest to run monit
+- Get Chef to drop off the user.yml
+
+Nick's making a wiki cookbook.
+** Chef Environment Issue
+Yesterday I made breaking changes to the firewall cookbook (replacing
+relayd with pound), so bumped the version to 1.0.0.  Using knife
+spork, I did cookbook version bumping and promoting, which worked
+fine.  The state being that when I had finished, the testing
+environment specified 1.0.5, the firewall was using the testing
+environment, and the newest version (with the pound changes) was
+uploaded.
+
+This morning, SJH made changes to correct the egress and ingress rules
+for UDP and TCP, and duly bumped the version and environment.
+However, because I failed to push my environment to git, Stuart's
+local copy was from a time when the version was 0.12ish, so he ended
+up setting the environment to a lower version.  This could have had
+the effect of pushing out changes from an earlier version.
+
+Lesson: ensure you push your environments!
+
+** Test Kitchen for OpenBSD and SmartOS
+NT has implemented some of this... need to find out how much.
+Specifically I am thinking of the fact that the firewall is using the
+testing environment, but that the testing environment lags behind the
+latest version.
 ** FahyFoto R3 Site
 https://livelinkinfraops.zendesk.com/agent/tickets/124
 Not sure what the process is here, or what the deadline is.
 
+Damon says there's no real deadline, but that things should really
+speed up a bit.  The dude has been waiting for 2 weeks.  I'm not sure
+what the status us, but I've said I'll look into it.  Also I've
+suggested that we have a chat with Ed and map out the flow and see
+what we can do to speed it up.
 
 
 
+
+** Walmart Hardware Order
+Yesterday I had a long session with Guy in which we outlined our
+thoughts about size and spec of machines.  I need to convert this into
+a spreadsheet and write it up for David today.  In principle, I think
+we are of the view that 60 drives machines could be very effective.
+To that end I asked Sentral to match the basic spec that Doug and
+Robert at Hammer had come up with.  They've done so, and come in at
+about the price I expected.
+
+I also had a very long conversation with the founder/ceo of 'Scalable
+Informatics', whom Heinz recommended.  He also knows Phil Hollenback.
+They build 60 drives machines to a high spec, and layout the ZFS stuff
+and offer a 3 year support package.  This seems excellent but looks
+like coming in at about 2 or 3 times more expensive per box, which at
+11 boxes is not insignificant.  I think perhaps we might want to try
+out one of them?
+** Provisioning a Ruby Site
+Spoke with SJH & SB about the steps to set up a Ruby site, such that
+it's ready to be deployed with Capistrano.  SJH outlined the following:
+
+- Provision Apache & Passenger
+- Create a deploy user
+- Add a vhost
+- Create an SMF manifest for apache with secret.key.base
+- Create a DB (if it doesn't exist)
+- Grant the privileges / create the user
+- Render the shared/database.yml
+- Create an internal DNS record for the zone
+- Create an external DNS record for the zone
+- Add appropriate entries to the pound config
+
+I gave a history lesson about starting from raw resources, then using
+definitions, then LWRPs then resources in a library, and recommended
+they start with the newest approach.  SJH asked about orchestration,
+and pointed out that Chef is very much focussed on a node by node
+basis, but that he is thinking at a higher level - how would we do this is Chef?
+
+I mentioned Chef Provisioning as something to look at, but also felt
+that for much of the stuff simply using Chef search ought to be
+sufficient.
