@@ -120,22 +120,22 @@ Branch master set up to track remote branch master from origin.
 ** Pound follow up
 Pound has been installed on the main firewall:
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
 Host rsbastion
   HostName 109.200.18.70
   User sns
   Port 3023
 IdentityFile ~/.ssh/id_dsa
-#+END_QUOTE
+#+END_SRC
 
 Chef has been updated accordingly, and relayd switched off.  The
 firewall is now configured to redirect http and https traffic to
 localhost, wherefrom Pound sends it to the right places:
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
 pass in quick on $ext_if proto tcp from any to $ext_if port http rdr-to 127.0.0.1
 pass in quick on $ext_if proto tcp from any to $ext_if port https rdr-to 127.0.0.1
-#+END_QUOTE
+#+END_SRC
 
 Pound is running out of rc.d, but not monitored or supervised in
 anyway.  It would be a good idea to have the process watched using
@@ -146,12 +146,19 @@ apache format which might be useful for analysis purposes.
 
 The logs are probably not being rotated, and there is no other monitoring on the box.
 
-Created ticket: https://livelinkinfraops.zendesk.wcom/agent/tickets/130
-for log rotation.  Created ticket:
-https://livelinkinfraops.zendesk.com/agent/tickets/131 for monitoring.
+- Created ticket:
+  https://livelinkinfraops.zendesk.wcom/agent/tickets/130 for log
+  rotation.
+
+- Created ticket:
+  https://livelinkinfraops.zendesk.com/agent/tickets/131 for
+  monitoring.
 
 Use of Relayd also isn't documented, which is largely a function of
 the wiki not being available.
+
+The process supervision is required for both pound and thin, so it's
+important to get right.
 ** Wiki Unavailable
 Discussed with NT & SB.  Current status is that the wiki exists in so
 far as there's a git repo, but it is hard to use.  I'd already created
@@ -159,7 +166,7 @@ a prototype wiki at 37.153.107.245.
 
 This used varnish to proxy to thin, and managed thin using monit:
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
 [root@28e8a2a4-7db4-ea0c-afeb-be0b963334f0 ~]# cat /opt/local/etc/default.vcl 
 backend default {
     .host = "127.0.0.1";
@@ -168,11 +175,11 @@ backend default {
 
 sub vcl_fetch {
     if (beresp.status == 302 && beresp.http.location ~ "/create") { return (hit_for_pass); }  }
-#+END_QUOTE
+#+END_SRC
 
 This is needed because when you create a site, there's a redirect, which gets cached.  Actually there are other problems with Varnish which are unresolved:
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC
 09:14 <Cope> Still have an oddity with my varnish / gollum setup... 
 09:15 <Cope> http://37.153.107.245:8080/Home
 09:15 <Cope> 1) Create a page & save
@@ -185,7 +192,7 @@ This is needed because when you create a site, there's a redirect, which gets ca
 09:41 <Cope> what's the best way to see what is actually happening?
 09:41 <Mithrandir> I tend to just use the network viewer in chromium
 09:41 <Mithrandir> but wireshark works too
-#+END_QUOTE
+#+END_SRC
 
 To run with thin, we just need a config.ru in the base of the directory we want to use.  Nick has augmented this to implement some authentication:
 
@@ -315,7 +322,6 @@ speed up a bit.  The dude has been waiting for 2 weeks.  I'm not sure
 what the status us, but I've said I'll look into it.  Also I've
 suggested that we have a chat with Ed and map out the flow and see
 what we can do to speed it up.
-
 
 
 
