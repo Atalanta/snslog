@@ -1,3 +1,251 @@
+* Sun Mar 15 12:50:05 GMT 2015
+** Things on my mind:
+
+- Get the wiki up
+- IRC cat
+- Monitoring live
+- Base on SmartOS
+- ACL working
+- S28/29 spreadsheet
+
+Soas usual I am feeling like there's a big chain of dependencies.  I'd
+like to do some stuff on SmartOS.  I'd like to be able to test it.  I
+could do that manually by creating machines in JPC, and managing them
+manually.  That would get things done.  It would be better to get that
+plugged into TK though.
+
+I'm going to go with primitive.
+
+** Base SmartOS
+
+This should be pretty straightforward.  First create a box.  Go to
+JPC.  Click on create an instance, select base-64-lts, pick the size.
+
+So next, what's the simplest, fastest way to get this machine
+provisioned?  Again, it'd be great to have a knife bootstrap template.
+But for now I'll do it manually.
+
+OK so we have the IP:  72.2.113.95.  My Bosch key is good for LLJPC.
+
+Now, for the purposes of an erb template, we need:
+
+#+BEGIN_SRC 
+pkgin -y in build-essential
+pkgin -y in ruby
+pkgin -y in ruby215-readline
+gem install chef --no-rdoc --no-ri
+#+END_SRC
+
+I wonder if there is a better SmartOS omnibus package.  Seems not
+really.  So we can look into this.
+
+So now that chef is installed, we just need to keys and stuff.  I have
+these on bosch.
+
+Getting to bosch from here is easy enough because I configured
+ssh... but which key?
+
+#+BEGIN_SRC 
+vermeer$ ssh-agent bash
+vermeer$ ssh-add /home/sns/.ssh/id_dsa (Heidegger)
+vermeer$ ssh-add /home/sns/.ssh/sns-laptop (Gentlemen)
+vermeer$ ssh-add /home/sns/.ssh/bosch (None) **** THIS ONE
+#+END_SRC
+
+From Bosch:
+
+#+BEGIN_SRC 
+sns@bosch:/tmp$ rsync -Pvar chef root@72.2.113.95:/etc
+#+END_SRC
+
+And then on wikitest:
+
+#+BEGIN_SRC 
+# chef-client
+DL is deprecated, please use Fiddle
+[2015-03-15T13:38:42+00:00] INFO: Forking chef instance to converge...
+Starting Chef Client, version 12.1.1
+[2015-03-15T13:38:43+00:00] INFO: *** Chef 12.1.1 ***
+[2015-03-15T13:38:43+00:00] INFO: Chef-client pid: 32168
+Creating a new client identity for wikitest1 using the validator key.
+[2015-03-15T13:38:46+00:00] INFO: Client key /etc/chef/client.pem is not present - registering
+[2015-03-15T13:38:47+00:00] INFO: HTTP Request Returned 404 Object Not Found: error
+[2015-03-15T13:38:48+00:00] INFO: Run List is []
+[2015-03-15T13:38:48+00:00] INFO: Run List expands to []
+[2015-03-15T13:38:48+00:00] INFO: Starting Chef Run for wikitest1
+[2015-03-15T13:38:48+00:00] INFO: Running start handlers
+[2015-03-15T13:38:48+00:00] INFO: Start handlers complete.
+resolving cookbooks for run list: []
+[2015-03-15T13:38:48+00:00] INFO: Loading cookbooks []
+Synchronizing Cookbooks:
+Compiling Cookbooks...
+[2015-03-15T13:38:48+00:00] WARN: Node wikitest1 has an empty run list.
+Converging 0 resources
+[2015-03-15T13:38:48+00:00] INFO: Chef Run complete in 0.789150147 seconds
+
+Running handlers:
+[2015-03-15T13:38:48+00:00] INFO: Running report handlers
+Running handlers complete
+[2015-03-15T13:38:48+00:00] INFO: Report handlers complete
+Chef Client finished, 0/0 resources updated in 5.862599973 seconds
+[2015-03-15T13:38:48+00:00] INFO: Sending resource update report (run-id: ffc699d3-b25b-431a-80e1-d4a599c3c7d6)
+#+END_SRC
+
+OK... so we want to check out the base:
+
+#+BEGIN_SRC
+sns@bosch:~/src/livelink-chef-repo/roles$ cat base.rb 
+name 'base'
+description 'Shared role for all systems'
+run_list 'recipe[base]'
+#+END_SRC
+
+Update the runlist:
+
+#+BEGIN_SRC 
+sns@bosch:~/src/livelink-chef-repo$ knife node run_list set wikitest1 'role[base]'
+#+END_SRC
+
+
+Running chef-client--- bugger:
+
+#+BEGIN_SRC 
+    * cannot determine group id for 'sbradly', does the group exist on this system?
+#+END_SRC
+
+
+OK, so, on SmartOS the user resource won't create a group.  Feels to
+me like the acl cookbook is needed now.
+
+** ACL Cookbook
+#+BEGIN_SRC 
+20:00 <Cope> I have a requirement to manage users on a fairly granular level, in terms of what each user can (and cannot) do, and over what machines.
+20:01 <Cope> my idea is to have an acls object (currently from a databag) which has keys corresponding to hostnames or patterns to match hostnames, and a default
+20:02 <Cope> with the values corresponding to a scale of permission level, where -1 is locked, 0 is no user, 1 is restricted user, 2 is login user, 3 is login user with some sudo power and 4 is full sudo
+20:02 <Cope> so each user gets one of these objects
+20:02 <Cope> and then on each node a decision can be made as to what sort of shell, what sort of sudo privs, etc should be in place
+20:03 <Cope> i wanted to avoud a whole mess of conditional logic in recipe code
+20:03 <Cope> so something that generates the data which defines the appropriate level of access for a user on a node
+20:03 <Cope> which is then handed to regular resources
+20:04 <Cope> this needs to work on disparate platforms too, so again, generating the data first, and working out what needs to be called could be done outside of teh recipe
+20:05 <Cope> i notice that the cool kids don't lwrp any more... so that's a consideratiob
+20:05 <Cope> anyway
+20:05 <Cope> thats the outline idea... what do you think?
+#+END_SRC
+
+Looked at MySQL cookbook.  Seems like this is a good pattern.  Parking for now.
+** LeoFS Call with Heinz Geis
+Scale - few big servers
+600TB in each (not ideal)
+Would prefer more small servers
+Works better this way
+recovery is better
+rep set to 3
+Why fewer large?  because there before
+may as well use them
+3TB SATAs x 60
+
+Packages in project fifo
+Operationally: hard to monitor
+Checks if machines are down
+JSON calls to API
+Behaves well
+if it goes down (system crash, network failure) restart
+been using since 0.6
+No problems since 1.1
+Entire network rewiring
+Update procedure - a bit manual
+Tell machine down, update and back up again
+Cannot chaneg replication factor after
+Need to decide now
+3 storage zones - then add a 2nd... and
+very easy to add
+say where is the master
+no masterless setup
+ring like (dynamo)
+2 management servers (client/master)
+coordination here
+rebalance suffles
+1 gateway
+zfs compression on storage servers
+still benefit (over many images)
+jpeg header always same... so there is some benefit
+zfs is smart - won't copress
+what goes wrong?
+worst - compact?
+manually tell it to delete old data
+not perfect with s3 clients
+large datasets - no problem with 
+large data in chyunks
+1GB zone image --> leofs chunk into 5MB chunks
+smaller just stored as 1 object
+can send zfs data into leofs
+chunk reads & writes
+uploads chunks in parallel
+download is the same
+tricky to sync r/w size
+classical approach of streaming up and down, gts around problem
+1-2MB no problem
+s3cmd or dragondisk osx - classic read and write non-chunked
+part of s3 api (so can ignore it... which would be fine)
+
+LeoFS - multi data centre aware
+async bkg replication between datacentres
+very sensible & smart
+keep 1 extra copy in each remote DC *(or more)
+3 copies + 1 in remote
+for DR... if we die, we have the data
+and quicker remote read access
+Japanese Amazon!
+Share data
+Perf baseline:
+
+cat sat 10G ether
+multi writes in parallel
+reads: 5GB +/-
+stripe of mirrors
+stripe of raidz2
+mirrors zfs log & cache
+scalable informatics
+1/2 TB memory
+e5 3.4 procesors
+512GB
+
+2U many disks (20ish)
+128+ memory
+reads - memory... good
+fifo contains monitoring
+rest by zabbix
+ZFS send is 100MB/s
+concat witg gzip -1
+sweet spot...
+50GB....
+
+data frequently accessed in l1 and l2 arc
+
+most data not needed; can build who storage to be fast
+can be as big as memory
+
+data on disk - lowest
+ssd act as l2 arc (not in memory... often used)
+l 1 = zfs using spare memory
+
+cache = 2 x ssds
+
+4TB ssd cache
+many disks
+
+zpool
+
+1GB memory & 100GB disk - lose performance
+becasue where stuff is layed out on disk is in memory... is there a rule of thumb
+
+l1 -> l2 -> arc cache
+
+zil / slog? enough to written to logs
+
+picked because R&W perf is much better
+basho sales were dicks
 * Wed 18 Mar 18:39:45 GMT 2015
 ** Pound
 Relayd isn't working well, so we need a replacement.
