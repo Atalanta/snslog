@@ -709,3 +709,49 @@ lo0: flags=2002000849<UP,LOOPBACK,RUNNING,MULTICAST,IPv6,VIRTUAL> mtu 8252 index
 [root@737e21f2-8f99-e8f9-ff4e-8a530796050e ~]# logout
 Connection to 10.128.2.6 closed.
 #+END_SRC
+* Sat Mar 21 20:31:48 UTC 2015
+** Workstation
+I managed to fill up / on my OpenBSD workstation, so I needed a
+rebuild.  Decided to give FreeBSD a go.  Downloaded the image and
+discovered that on the mac it is very slow to dd, resulting in me
+being impatient, and pulling out the stick before it was finished.  To
+show progress as dd runs, we can use pv:
+
+#+BEGIN_SRC 
+pv -ptearb FreeBSD-10.1-RELEASE-amd64-mini-memstick.img | dd of=/dev/rdisk2 bs=1024
+#+END_SRC
+
+I installed FreeBSD and then went into /usr/ports/x11/xorg and did a make install clean.
+
+I forgot to do a make config-recursive, but remembered next time!
+
+Next up: i3lock, i3status and i3.
+
+Other things I will want:
+
+- screen
+- emacs
+- firefox
+- ruby
+- dmenu
+- rxvt-unicode
+- feh?
+- inconsolata font
+
+Once all installed, I rsync'd back from Chenrezig.  This is all a bit
+messy, and needs to be tidied up, but I have all teh data, and the
+Firefox cache even came over!
+
+One consideration is that FreeBSD does not read .Xresources by
+default. And when I copied it over to .Xdefaults, it came up in pink!
+
+However, xrdb ~/.Xresources worked fine, so I shall add that to my .xinitrc, which currently says:
+
+#+BEGIN_SRC 
+[[ -f ~/.Xresources ]] && xrdb -merge ~/.Xresources
+setxkbmap -layout gb -option ctrl:nocaps &
+xsetroot -solid black &
+exec i3
+#+END_SRC
+
+So I think if I just remove the -merge bit, it should be fine.  Let's test that out.
