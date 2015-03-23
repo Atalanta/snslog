@@ -755,3 +755,782 @@ exec i3
 #+END_SRC
 
 So I think if I just remove the -merge bit, it should be fine.  Let's test that out.
+
+OK, this doesn't work... i need to do a manual xrdb from an xterm after.  That's something to iron out later.
+
+Added git, and built ruby from src using ruby-install, and managed with chruby.
+** Loadbalancer and Wiki
+So the thinking before was that the firewall (loadbalancer) was going
+to be done properly, ie documented well.  So we started thinking about
+the wiki.  We now have a working wiki prototype, with apache, and
+authentication.  That means in theory we could get it up and running
+on JPC, and then move it to RS later.  I'd rather do it in RS
+properly, TBH.
+
+*** Nick's Tests
+First, let's look at nick's wiki cookbook.  OK awesome - it has tests.
+Let's try running them!
+
+OK, first need to install Test Kitchen:
+
+#+BEGIN_SRC 
+>>>>>> Message: Could not load the 'joyent' driver from the load path. Please ensure that your driver is installed as a gem or included in your Gemfile if using Bundler.
+#+END_SRC
+
+OK, also need kitchen-joyent... and Berkshelf.
+
+Aha this falls over on gecode:
+*** Gecode Issues on FreeBSD
+
+#+BEGIN_SRC 
+/usr/home/sns/.gem/ruby/2.2.1/gems/dep-selector-libgecode-1.0.2/ext/libgecode3/vendor/gecode-3.7.3/configure: 11561: Syntax error: word unexpected (expecting ")")
+extconf.rb:98:in `block in run': Failed to build gecode library. (GecodeBuild::BuildError)
+        from extconf.rb:97:in `chdir'
+        from extconf.rb:97:in `run'
+        from extconf.rb:104:in `<main>'
+
+extconf failed, exit code 1
+#+END_SRC
+
+There's an issue for this: https://github.com/berkshelf/berkshelf/issues/1280
+
+The recommendation is to use system gecode: USE_SYSTEM_GECODE=1 gem install berkshelf
+
+However, doing this requires that we use ~>3.5 gecode.  Ports currently provides 4.3.
+
+https://secure.freshbsd.org/search?project=freebsd-ports&q=gecode
+
+Now, if we install portdowngrade, we can run:
+
+portdowngrade devel/gecode r345033
+
+So this installs gecode, which should mean we can now set USE_SYSTEM_GECODE.  However, this didn't find it:
+
+https://gist.github.com/Atalanta/1e3fcfaa53436731adad
+
+I think this is because if I used FreeBSD's Ruby, the system path
+would be set, but since I just installed it using ruby-install
+locally, it doesn't know where to look.
+
+Noah pointed me to using Bundler instead:
+
+#+BEGIN_SRC 
+ bundle config build.dep_selector "--with-cflags=\"-I$HOME/gecode-3.7.3/include\"
+--with-cppflags=\"-I$HOME/gecode-3.7.3/include\" --with-ldflags=\"-L$HOME/gecode-3.7.3/lib
+-Wl,-rpath=$HOME/gecode-3.7.3/lib\""
+#+END_SRC
+
+But this still fails:
+
+#+BEGIN_SRC 
+Gem::Ext::BuildError: ERROR: Failed to build gem native extension.
+
+    /home/sns/.rubies/ruby-2.2.1/bin/ruby -r ./siteconf20150321-98277-1wukayp.rb extconf.rb --with-cflags='-I ./gecode-3.7.3/include' --with-cppflags='-I ./gecode-3.7.3/include' --with-ldflags='-L ./gecode-3.7.3/lib -Wl,-rpath=./gecode-3.7.3/lib'
+checking for main() in -lgecodesupport... no
+checking for main() in -lgecodesupport... no
+#+END_SRC
+
+Going to try just doing it manually.  I already know I need to change
+the shebang in the configure script to #!/usr/bin/env bash.
+
+#+BEGIN_SRC 
+./configure
+gmake
+gmake install
+#+END_SRC
+
+#+BEGIN_SRC 
+USE_SYSTEM_GECODE=1 gem install berkshelf --no-ri --no-rdoc -- -with-cflags="-I/usr/local/include" --with-cppflags="-I/usr/local/include" --with-ldflags="-L/usr/local/lib -Wl,-rpath=/usr/local/lib"
+#+END_SRC
+
+This works.  The bundler invocation was referring to an Ubuntu binary.
+
+Back to Kitchen.
+*** Kitchen Joyent
+#+BEGIN_SRC 
+$ kitchen create   
+-----> Starting Kitchen (v1.3.1)
+-----> Creating <default-smartos-1430>...
+>>>>>> ------Exception-------
+>>>>>> Class: Kitchen::ActionFailed
+>>>>>> Message: Failed to complete #create action: [options[:joyent_keyfile] provided does not exist.]
+>>>>>> ----------------------
+>>>>>> Please see .kitchen/logs/kitchen.log for more details
+>>>>>> Also try running `kitchen diagnose --all` for configuration
+#+END_SRC
+
+Aha, that's because I am using Nick's .kitchen.yml:
+
+#+BEGIN_SRC 
+$ cat .kitchen.yml 
+---
+driver:
+  name: joyent
+  joyent_username: testkitchen
+  joyent_keyfile: /home/nick/.ssh/id_rsa
+  joyent_keyname: 74:cc:45:6b:00:5a:a5:0d:45:29:8c:5c:ba:9c:39:42
+  joyent_url: https://10.129.128.4
+  joyent_ssl_verify_peer: false
+
+provisioner:
+  name: chef_zero
+
+platforms:
+  - name: smartos-14.3.0
+    driver:
+      joyent_image_id: 62f148f8-6e84-11e4-82c5-efca60348b9f
+      joyent_flavor_id: 'Chef Basic'
+    provisioner:
+      chef_omnibus_url: https://gist.githubusercontent.com/vxnick/f6e56edba66798638156/raw
+      chef_client_path: /opt/local/bin/chef-client
+suites:
+  - name: default
+    run_list:
+      - recipe[wiki::default]
+    attributes:
+      wiki:
+        testing: true
+    data_bags_path: "test/integration/data_bags"
+#+END_SRC
+
+So a few things occur to me here:
+
+- I don't have Nick's Key
+- I don't have access to SDC from home
+- The flavor is set to 'Chef Basic' which is obviously something custom which won't be in JPC
+
+The key isn't an issue.  My own key is on SDC.  I do need the
+fingerprint, but that'll be in the SDC interface.  So as long as I
+have access to SDC, I should be fine.  So, let's go to Bosch.  OK from
+here I can see SDC, but I need the SDC address internally, and a proxy.
+
+MCH SDC is at:
+
+- https://10.129.128.2/ (20150302 - SDC)
+
+Which I ought to have access to from mch-bastion.  So, let's set up a tunnel.
+
+#+BEGIN_SRC 
+ssh -D 8080 mch-bastion
+#+END_SRC
+
+Now I can hit SDC, and login (admin/Earl205Roberts).
+
+OK, so a user/key - Added bosch.pub:
+
+- 97:12:64:8a:34:8e:a8:46:fe:48:a6:d5:85:ca:93:c2
+
+I should be able to shut my proxy off now, and change my .kitchen.yml, and then run the tests.
+
+Added teh following to .kitchen.local.yml
+
+#+BEGIN_SRC 
+---
+driver:
+  name: joyent
+  joyent_username: testkitchen
+  joyent_keyfile: /home/sns/.ssh/id_dsa
+  joyent_keyname: 97:12:64:8a:34:8e:a8:46:fe:48:a6:d5:85:ca:93:c2
+  joyent_url: https://10.129.128.4
+  joyent_ssl_verify_peer: false
+#+END_SRC
+
+
+$ kitchen create
+-----> Starting Kitchen (v1.3.1)
+-----> Creating <default-smartos-1430>...
+       Joyent <92a6de15-81db-e96e-c36f-d290011255d2> created.
+................................       (server ready)
+       (ssh ready)
+
+       Finished creating <default-smartos-1430> (0m33.77s).
+-----> Kitchen is finished. (0m34.28s)
+
+$ kitchen destroy
+-----> Starting Kitchen (v1.3.1)
+-----> Destroying <default-smartos-1430>...
+       Joyent instance <92a6de15-81db-e96e-c36f-d290011255d2> destroyed.
+       Finished destroying <default-smartos-1430> (0m0.47s).
+-----> Kitchen is finished. (0m0.99s)
+
+OK, let's try a converge:
+
+#+BEGIN_SRC 
+downloading https://gist.githubusercontent.com/vxnick/f6e56edba66798638156/raw to file /tmp/install.sh
+#+END_SRC
+
+OK this is slow, installing all this stuff.  This should go in an
+image, and we should invest time in getting a SmartOS omnibus package.
+
+Still it works.
+*** Finishing the cookbook
+So Nick's cookbook won't converge properly:
+
+#+BEGIN_SRC 
+ ---- Begin output of thin -C /opt/local/wiki/thin.yml start ----
+       STDOUT: 
+       STDERR: /opt/local/lib/ruby/gems/2.1.4/gems/thin-1.6.3/lib/thin/daemonizing.rb:171:in `remove_stale_pid_file': tmp/pids/thin.pid already exists, seems like it's already running (process ID: 8197). Stop the process or delete tmp/pids/thin.pid. (Thin::PidFileExist)
+#+END_SRC
+
+OK, so we want to get this up and running.  We have the basic stuff
+installed, and we can easily get the apache and thin config in place.
+What it doesn't have is monit, which we use to supervise the service.
+
+There's of course a who watches the watcher, so let's get monit running in SMF.
+
+#+BEGIN_SRC 
+pkgin install py27-pip
+pip install manifold
+manifold monit.xml
+svccfg import monit.xml 
+svcadm enable monit
+#+END_SRC
+
+This works just fine.  So for our recipe, we could drop the file off
+somewhere, and import it with an execute resource, and enable it.
+
+Better would be to use Eric's SMF LWRP, which I'll try next.
+** X Fiddling
+Had a play with i3lock, and got it to match Solarized colours:
+
+#+BEGIN_SRC 
+i3lock -c 002b36
+#+END_SRC
+
+And a play with i3status, to get it to return a bit more data:
+
+#+BEGIN_SRC 
+$ cat .i3config 
+ general {
+                   output_format = "term"
+                   colors = true
+                   interval = 5
+           }
+
+           order += "disk /"
+           order += "ethernet em0"
+           order += "load"
+           order += "tztime local"
+
+           ethernet em0 {
+                   # if you use %speed, i3status requires the cap_net_admin capability
+                   format_up = "E: %ip (%speed)"
+                   format_down = "E: down"
+           }
+
+           tztime local {
+                   format = "%Y-%m-%d %H:%M:%S"
+           }
+
+           load {
+                   format = "%5min"
+           }
+
+           disk "/" {
+                   format = "%free"
+           }
+#+END_SRC
+
+* Sun Mar 22 08:43:32 GMT 2015
+** Monit / SMF
+We're at the stage with the wiki that it's close to working, and we
+have a cookbook which can be tested, and which runs on SmartOS.  The
+main missing feature was the process supervision of Thin.  This could
+be handled with SMF, but given that the plan is to run monit on all
+machines, for alerting, we may as well use it to supervise (and
+monitor/alert) Thin too.
+
+We reached the point where we have a working monit config for the
+thins, and needed to install and start (and monitor) monit itself.
+SMF is the perfect candidate for this.  I built a simple manifest
+using Manifold which seems to do the trick, but then I found the SMF
+LWRP which looks like a potentially better approach.
+
+My manifest looks like this:
+
+#+BEGIN_SRC 
+<?xml version="1.0"?>
+<!DOCTYPE service_bundle SYSTEM "/usr/share/lib/xml/dtd/service_bundle.dtd.1">
+<!--
+        Created by Manifold
+--><service_bundle type="manifest" name="monit">
+
+    <service name="site/monit" type="service" version="1">
+
+        <create_default_instance enabled="false"/>
+        
+        <single_instance/>
+
+        <dependency name="network" grouping="require_all" restart_on="error" type="service">
+            <service_fmri value="svc:/milestone/network:default"/>
+        </dependency>
+
+        <dependency name="filesystem" grouping="require_all" restart_on="error" type="service">
+            <service_fmri value="svc:/system/filesystem/local"/>
+        </dependency>
+
+
+        
+        
+        
+        
+        <method_context>
+            <method_credential user="root" group="root"/>
+        </method_context>
+
+        <exec_method type="method" name="start" exec="/opt/local/bin/monit" timeout_seconds="60"/>
+
+        <exec_method type="method" name="stop" exec=":kill" timeout_seconds="60"/>
+
+        <property_group name="startd" type="framework">
+            
+            
+            <propval name="duration" type="astring" value="contract"/>
+            <propval name="ignore_error" type="astring" value="core,signal"/>
+        </property_group>
+
+        <property_group name="application" type="application">
+            <propval name="config_file" type="astring" value="/opt/local/etc/monit/monitrc"/>
+        </property_group>
+        
+        
+        <stability value="Evolving"/>
+
+        <template>
+            <common_name>
+                <loctext xml:lang="C">
+                    Monit
+                </loctext>
+            </common_name>
+        </template>
+
+    </service>
+
+</service_bundle>
+#+END_SRC
+
+Nick's tests fail because the node won't converge, as there's no guard
+on the execute.  I've removed the  execute, and am converging again to
+see if the  earlier tests pass.  Well, the node  converges, which is a
+start.  Excellent - those tests pass.
+** Getting Base Tests Passing
+- Copied my.kitchen.local.yml over, and the .kitchen.yml from wiki
+- examining diff
+#+BEGIN_SRC 
+$ git diff .kitchen.yml
+diff --git a/cookbooks/base/.kitchen.yml b/cookbooks/base/.kitchen.yml
+index 47d832e..6ee485d 100644
+--- a/cookbooks/base/.kitchen.yml
++++ b/cookbooks/base/.kitchen.yml
+@@ -1,10 +1,7 @@
+ ---
+ driver:
+   name: joyent
+-  # vagrantfile_erb: VagrantOverride.erb
+   joyent_username: testkitchen
+-  joyent_keyfile: /home/nick/.ssh/id_rsa
+-  joyent_keyname: 74:cc:45:6b:00:5a:a5:0d:45:29:8c:5c:ba:9c:39:42
+   joyent_url: https://10.129.128.4
+   joyent_ssl_verify_peer: false
+ 
+@@ -17,33 +14,13 @@ platforms:
+       joyent_image_id: 62f148f8-6e84-11e4-82c5-efca60348b9f
+       joyent_flavor_id: 'Chef Basic'
+     provisioner:
+-      # require_chef_omnibus: true
+-      chef_omnibus_url: https://gist.githubusercontent.com/vxnick/f6e56edba66798638156/raw/cbc5cc25a87c192044438bcef3833ad2c05a5e3c/gistfile1.txt
++      chef_omnibus_url: https://gist.githubusercontent.com/vxnick/f6e56edba66798638156/raw
+       chef_client_path: /opt/local/bin/chef-client
+-  - name: ubuntu-14.04
+-    driver:
+-      joyent_image_id: b7493690-f019-4612-958b-bab5f844283e
+-      joyent_flavor_id: 'Chef Basic'
+-
+-  # - name: ubuntu-14.04
+-  #   driver:
+-  #     box: opscode-ubuntu-14.04
+-  # - name: openbsd-5.6
+-  #   provisioner:
+-  #     require_chef_omnibus: false
+-  #   driver:
+-  #     box: openbsd-5.6
+-  #   busser:
+-  #     root_path: /opt/busser
+-
+ suites:
+   - name: default
+     run_list:
+-      - recipe[base::default]
++      - recipe[wiki::default]
+     attributes:
+-      chef_client:
+-        depends_client_rb: false
+-      openssh:
+-        server:
+-          port: [22, 3023]
++      wiki:
++        testing: true
+     data_bags_path: "test/integration/data_bags"
+#+END_SRC
+
+Right, merged that, removed commented code.  Testing a create/converge
+for base.  Create works as expected... let's see what happens with a converge.
+
+OK this fails as expected, because the users manage LWRP doesn't work
+on SmartOS.  We're going to replace this with the ACL cookbook
+shortly, but for now, given that SDC allows us access to the machine,
+we can install the rest of the base stuff.
+
+Not sure why the dd-agent-postfix thing is in the smartos cookbook - I
+think this is actually another case where if we did this correcty
+(with the ACLs cookbook), it wouldn't be needed.
+
+#+BEGIN_SRC 
+           Chef::Exceptions::EnclosingDirectoryDoesNotExist
+           ------------------------------------------------
+           Parent directory /etc/sudoers.d does not exist.
+#+END_SRC
+
+This should be handled by attributes:
+
+#+BEGIN_SRC 
+default['authorization']['sudo']['include_sudoers_d'] = true
+#+END_SRC
+
+
+So we need to debug this.
+
+Installed pry (using pkgin, so we don't get readline nasties).  Now Chef runs:
+
+#+BEGIN_SRC 
+/opt/local/bin/chef-client --local-mode --config /tmp/kitchen/client.rb --log_level debug --force-formatter --no-color --chef-zero-port 8889 --json-attributes /tmp/kitchen/dna.json
+#+END_SRC
+
+
+OK, so we see that the attr is set:
+
+#+BEGIN_SRC 
+"authorization"=>
+    {"sudo"=>
+      {"groups"=>["wheel", "infraops", "sudo"],
+       "users"=>[],
+       "passwordless"=>true,
+       "include_sudoers_d"=>true,
+       "agent_forwarding"=>false,
+       "sudoers_defaults"=>["!lecture,tty_tickets,!fqdn"],
+       "command_aliases"=>[],
+       "prefix"=>"/opt/local/etc"}}
+#+END_SRC
+
+Aha:
+
+#+BEGIN_SRC 
+Recipe: sudo::default
+  * smartos_package[sudo] action install (skipped due to not_if)
+  * directory[/opt/local/etc/sudoers.d] action create (up to date)
+  * cookbook_file[/opt/local/etc/sudoers.d/README] action create (up to date)
+  * template[/opt/local/etc/sudoers] action create (up to date)
+#+END_SRC
+
+Right, fixing the sudoers package makes base converge.  Minus the users of course.
+Let's run the tests: aha
+** Fixing Busser
+#+BEGIN_SRC 
+$ kitchen verify smart
+-----> Starting Kitchen (v1.3.1)
+-----> Setting up <default-smartos-1430>...
+       sh: line 4: /opt/chef/embedded/bin/ruby: not found
+       sudo: /opt/chef/embedded/bin/gem: command not found
+       sudo: /opt/chef/embedded/bin/gem: command not found
+       sudo: /busser: command not found
+       sudo: /tmp/busser/bin/busser: command not found
+>>>>>> Setup failed on instance <default-smartos-1430>.
+>>>>>> Please see .kitchen/logs/default-smartos-1430.log for more details
+>>>>>> ------Exception-------
+>>>>>> Class: Kitchen::ActionFailed
+>>>>>> Message: SSH exited (1) for command: [sh -c '
+BUSSER_ROOT="/tmp/busser" GEM_HOME="/tmp/busser/gems" GEM_PATH="/tmp/busser/gems" GEM_CACHE="/tmp/busser/gems/cache" 
+export BUSSER_ROOT GEM_HOME GEM_PATH GEM_CACHE
+gem_bindir=`/opt/chef/embedded/bin/ruby -rrubygems -e "puts Gem.bindir"`
+
+if ! sudo -E /opt/chef/embedded/bin/gem list busser -i >/dev/null; then
+  sudo -E /opt/chef/embedded/bin/gem install busser --no-rdoc --no-ri
+fi
+sudo -E ${gem_bindir}/busser setup
+sudo -E /tmp/busser/bin/busser plugin install busser-serverspec
+']
+>>>>>> ----------------------
+#+END_SRC
+
+#+BEGIN_SRC 
+D      Setup failed on instance <default-smartos-1430>.
+D      ------Exception-------
+D      Class: Kitchen::InstanceFailure
+D      Message: Setup failed on instance <default-smartos-1430>.  Please see .kitchen/logs/default-smartos-1430.log for more details
+D      ---Nested Exception---
+D      Class: Kitchen::ActionFailed
+D      Message: SSH exited (1) for command: [sh -c '
+BUSSER_ROOT="/tmp/busser" GEM_HOME="/tmp/busser/gems" GEM_PATH="/tmp/busser/gems" GEM_CACHE="/tmp/busser/gems/cache" 
+export BUSSER_ROOT GEM_HOME GEM_PATH GEM_CACHE
+gem_bindir=`/opt/chef/embedded/bin/ruby -rrubygems -e "puts Gem.bindir"`
+
+if ! sudo -E /opt/chef/embedded/bin/gem list busser -i >/dev/null; then
+  sudo -E /opt/chef/embedded/bin/gem install busser --no-rdoc --no-ri
+fi
+sudo -E ${gem_bindir}/busser setup
+#+END_SRC
+
+#+BEGIN_SRC 
+[sns@vermeer ~/src/test-kitchen]$ grep gem_bindir lib/kitchen/busser.rb 
+        gem_bindir=`#{ruby} -rrubygems -e "puts Gem.bindir"`
+        #{sudo("${gem_bindir}")}/busser setup
+#+END_SRC
+
+
+Ruby comes from:
+
+#+BEGIN_SRC 
+      ruby    = "#{config[:ruby_bindir]}/ruby"
+#+END_SRC
+
+
+So we need to set ruby_bindir
+
+#+BEGIN_SRC 
+      @config[:ruby_bindir] = opts.fetch(:ruby_bindir, DEFAULT_RUBY_BINDIR)
+#+END_SRC
+
+
+So we need to get ruby_bindir into the config hash.
+This comes from data.busser_data_for in config.rb
+
+This uses merged_data_for... which I think must come from a suite
+
+OK... so basically we have a busser entry in .kitchen.yml
+
+#+BEGIN_SRC 
+ busser:
+      busser_bin: "/tmp/busser/bin/busser"
+      kitchen_root: "/home/sns/src/livelink-chef-repo/cookbooks/base"
+      root_path: "/tmp/busser"
+      ruby_bindir: "/opt/chef/embedded/bin"
+      sudo: true
+      suite_name: default
+      test_base_path: "/home/sns/src/livelink-chef-repo/cookbooks/base/test/integration"
+      version: busser
+#+END_SRC
+
+So we can insert this under a platform, and, lo, it works!
+** Adding Monit Tests
+OK, so in base we want to install and start Monit with a default config.  There's a package everywhere.
+
+#+BEGIN_SRC 
+       Failures:
+        
+         1) base::default runs the monit web service
+            Failure/Error: expect(port(2812)).to be_listening
+              expected Port "2812" to be listening
+              /bin/sh -c netstat\ -tunl\ \|\ grep\ --\ :2812\\\ 
+              /native/usr/bin/netstat: illegal option -- t
+       usage: /native/usr/bin/netstat [-anv] [-f address_family] [-T d|u]
+       /native/usr/bin/netstat [-n] [-f address_family] [-P protocol] [-T d|u] [-g | -p | -s [interval [count]]]
+       /native/usr/bin/netstat -m [-v] [-T d|u] [interval [count]]
+       /native/usr/bin/netstat -i [-I interface] [-an] [-f address_family] [-T d|u] [interval [count]]
+       /native/usr/bin/netstat -r [-anv] [-f address_family|filter] [-T d|u]
+       /native/usr/bin/netstat -M [-ns] [-f address_family] [-T d|u]
+       /native/usr/bin/netstat -D [-I interface] [-f address_family] [-T d|u]
+
+#+END_SRC
+
+We're using a branded zone here... which is obviously using native
+netstat.  We'll just use netstat -an to geta round this.
+
+#+BEGIN_SRC 
+ base::default
+         installs tmux (if needed)
+         installs vim
+         installs monit
+         starts the monit daemon
+         runs the monit web service
+       
+       Finished in 1.41 seconds (files took 0.29756 seconds to load)
+       5 examples, 0 failures
+       
+       Finished verifying <default-ubuntu-1404> (0m16.21s).
+-----> Destroying <default-ubuntu-1404>...
+       Joyent instance <7f59e9df-3af3-4c39-caf5-f447917cf4a5> destroyed.
+       Finished destroying <default-ubuntu-1404> (0m0.96s).
+       Finished testing <default-ubuntu-1404> (3m18.83s).
+-----> Kitchen is finished. (3m19.33s)
+#+END_SRC
+
+Getting smartos working was as simple as using the SMF cookbook.  All passing.
+** Using Monit in Wiki
+OK, so I'm thinking that monit should really be its own cookbook,
+because otherwise, in order to use monit, we need to include base,
+which doesn't feel right.  However, just supposing we did:
+
+#+BEGIN_SRC 
+include_recipe 'base'
+#+END_SRC
+
+
+OK - now we have monit.
+
+So we could then:
+
+- Drop off a thin file in monit.d
+- Send monit a reload
+
+Which is ok for now.
+
+First things first, let's run these tests again:
+
+#+BEGIN_SRC 
+       * cannot determine user id for 'wiki', does the user exist on this system?
+           ================================================================================
+           Error executing action `create` on resource 'template[/opt/local/wiki/thin.yml]'
+           ================================================================================
+           
+           Chef::Exceptions::UserIDNotFound
+           --------------------------------
+           cannot determine user id for 'wiki', does the user exist on this system?
+           
+           Resource Declaration:
+           ---------------------
+           # In /tmp/kitchen/cache/cookbooks/wiki/recipes/default.rb
+       
+            34: template "#{wiki_root_path}/thin.yml" do
+            35:   source 'thin-yml.erb'
+        36:   variables(wiki_root_path: wiki_root_path)
+            37:   owner 'wiki'
+        38:   group 'wiki'
+        39: end
+            40: 
+
+#+END_SRC
+
+
+
+Obviously I accidentally trashed some stuff!  So I've put that back,
+and it converges.  Adding the base stuff in, though, results in an SMF
+dependency issue.  Looks like Nick made a change to the chef-client cookbook
+to make test-kitchen work.
+
+#+BEGIN_SRC 
+    attributes:
+      chef_client:
+        depends_client_rb: false
+#+END_SRC
+
+Including this makes it work (magic...).
+
+Now it turns out I can't send monit a reload via SMF.  So I'll have to do that with an execute resource.
+
+OK, I didnt correct the paths in the thin.yml, so needed to correct that, but now it doesn't restart:
+
+#+BEGIN_SRC 
+ ================================================================================
+           Error executing action `restart` on resource 'service[monit]'
+           ================================================================================
+           
+           Mixlib::ShellOut::CommandTimeout
+           --------------------------------
+           Command timed out after 600s:
+       Command exceeded allowed execution time, process terminated
+           ---- Begin output of /usr/sbin/svcadm disable -s monit ----
+         * smartos_package[apache] action install  
+           STDOUT: 
+           STDERR: 
+           ---- End output of /usr/sbin/svcadm disable -s monit ----
+           Ran /usr/sbin/svcadm disable -s monit returned 
+           
+           Resource Declaration:
+           ---------------------
+           # In /tmp/kitchen/cache/cookbooks/base/recipes/_smartos.rb
+           
+         8: service 'monit' do
+         9:   action [:enable]
+        10: end
+        11: 
+           
+           Compiled Resource:
+           ------------------
+           # Declared in /tmp/kitchen/cache/cookbooks/base/recipes/_smartos.rb:8:in `from_file'
+       
+       service("monit") do
+             action [:enable]
+             supports {:restart=>false, :reload=>false, :status=>false}
+             retries 0
+             retry_delay 2
+             default_guard_interpreter :default
+             service_name "monit"
+             enabled true
+             running true
+             pattern "monit"
+             declared_type :service
+             cookbook_name "base"
+             recipe_name "_smartos"
+       end
+           
+       Recipe: wiki::default
+         * execute[Reload Monit] action run
+           - execute monit reload
+       [2015-03-22T19:22:55+00:00] ERROR: Converge failed with error message service[monit] (base::_smartos line 8) had an error: Mixlib::ShellOut::CommandTimeout: Command timed out after 600s:
+       Command exceeded allowed execution time, process terminated
+       ---- Begin output of /usr/sbin/svcadm disable -s monit ----
+       STDOUT: 
+       STDERR: 
+       ---- End output of /usr/sbin/svcadm disable -s monit ----
+       Ran /usr/sbin/svcadm disable -s monit returned 
+
+#+END_SRC
+
+I suspect the stop method is insufficient. Hmm unsure.
+
+Logged onto machine, ws able to stop and start fine.  However, noticed
+that the config file still referred to conf.d not monit.d.  Fixed
+that.  Now monit starts, and attempts to supervise thin, but without
+joy.  I think the issue here is that the path is wrong:
+
+#+BEGIN_SRC 
+# ls -l /opt/local/wiki
+total 48
+-rwxr-xr-x  1 root root  59 Mar 22 18:21 git-wrapper
+-rw-r--r--  1 wiki wiki 266 Mar 22 18:21 thin.yml
+-rw-r--r--  1 wiki wiki 119 Mar 22 18:21 users.yml
+drwxr-xr-x 12 wiki root  27 Mar 23 00:07 wiki
+#+END_SRC
+
+
+
+** Call with David and Luke
+Had a call with David and Luke, and talked through the spreadsheet and
+cyrus one.  The overall feeling was that we like the 60 drive machine
+best, and should get a few of those, and 20 or so of the compute
+nodes.  The main questions were:
+
+- should we get them from the US directly, or via UK
+- do we really need 10 -> 20 racks?  Could we settle on something smaller?
+- what are the power whips? how does that impact?
+- are the cross connects the ones between datacentres?
+- are we fine to wire between racks?
+- do we need to provide the racks?
+
+We also need prices on the 10 dwpd disks (which look very expensive)
+** Chat with Heinz re: MDC
+Heinz hasn't played with MDC yet, but seems to think it will offer one of:
+
+- Copies = N+(dc replica * dcs)
+- N = LocalReplicas + (dc replicas * dcs)
+
+He suggests testing, viz:
+
+- if you have 6 free servers best thing would be to try it out
+- set up to two Instances configure them as two DC's and see how the config affects it
+- if you put 1 T into the one cluster you should see 3T disk useage there
+- and 1T disk usage on the replica cluster
+
+So if the idea is that we use 3N in the main site and 1N in DR, we still need 3 machines (or whatever).
+
+I guess that makes the DR site 1/3, or a quarter overall.
