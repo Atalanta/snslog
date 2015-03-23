@@ -608,6 +608,89 @@ So monit needs to know:
 For thin, we'd want to have separate processes for each one, rather
 than start a cluster, as deriving the pids would be trickier.
 
+Looking at the help, a few things catch my eye:
+
+-  -S, --socket FILE                bind to unix domain socket
+-  -P, --pid FILE                   File to store PID (default: tmp/pids/thin.pid)
+-  -s, --servers NUM                Number of servers to start
+
+Actually it seems like the best approach is to put the various options into a config.yml file, like this:
+
+#+BEGIN_SRC 
+# cat config.yml
+---
+user: nobody
+group: nobody
+pid: /var/run/thin.pid
+timeout: 30
+wait: 30
+log: log/thin.log
+max_conns: 1024
+require: []
+environment: production
+max_persistent_conns: 512
+servers: 4
+threaded: true
+daemonize: true
+socket: tmp/sockets/thin.sock
+chdir: /root/mithrandir
+#+END_SRC
+
+This allows the thin processes to be controlled using the -o, --only
+option, so we can start and stop a cluster one by one.
+
+Monit can do this with stanzas like this:
+
+#+BEGIN_SRC 
+check process thin-0 
+    with pidfile /var/run/thin.0.pid
+    start program = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 0 start"
+    stop program  = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 0 stop"
+#+END_SRC
+
+We can run a bunch of them like this:
+
+#+BEGIN_SRC 
+check process thin-0 
+    with pidfile /var/run/thin.0.pid
+    start program = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 0 start"
+    stop program  = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 0 stop"
+
+check process thin-1
+    with pidfile /var/run/thin.1.pid
+    start program = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 1 start"
+    stop program  = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 1 stop"
+
+check process thin-2
+    with pidfile /var/run/thin.2.pid
+    start program = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 2 start"
+    stop program  = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 2 stop"
+
+check process thin-3 
+    with pidfile /var/run/thin.3.pid
+    start program = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 3 start"
+    stop program  = "/opt/local/bin/thin -C /root/mithrandir/config.yml -o 3 stop"
+#+END_SRC
+
+Obviously we need to put the app somewhere sensible, but that's detail.
+** Apache 2.4 and Unix Domain Sockets
+Apache 2.4 (since 2.4.7) can talk to Unix Domain Sockets in mod_proxy:
+
+#+BEGIN_SRC 
+<VirtualHost *:80>
+        ServerName infraopswiki.livelinkprint.com
+        DocumentRoot /root/mithrandir
+
+        <Proxy balancer://mycluster/>
+                BalancerMember unix:/root/mithrandir/tmp/sockets/thin.0.sock|http://localhost
+                BalancerMember unix:/root/mithrandir/tmp/sockets/thin.1.sock|http://localhost
+                BalancerMember unix:/root/mithrandir/tmp/sockets/thin.2.sock|http://localhost
+                BalancerMember unix:/root/mithrandir/tmp/sockets/thin.3.sock|http://localhost
+        </Proxy>
+        ProxyPass / balancer://mycluster/       
+</VirtualHost>
+
+#+END_SRC
 ** Push after or before a promote --remote
 This is a discussion - we need to do one or the other.  I know Etsy
 have struggled with this.  They settled for after, because the server
