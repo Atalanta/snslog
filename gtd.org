@@ -1,0 +1,19 @@
+* Capture
+- induction for nick
+- 1 month induction for bs
+- replace shure headphoe
+* Projects
+** Update http testing wiki
+- http://www.the-art-of-web.com/system/telnet-http11/
+** Evaluate Lastpass
+** Rebuild macbook
+** Update Bastion wiki
+- http://www.bsdnow.tv/tutorials/ssh-chaining
+** Update Firewall Wiki
+- http://www.bsdnow.tv/tutorials/openbsd-router
+- http://home.nuug.no/~peter/pf/newest/
+- http://www.bsdnow.tv/tutorials/openbsd-router
+** TODO Book Signing at Chef Conf
+- Nathen asked me
+- Jen Burke to organize
+* Next Actions
