@@ -1617,3 +1617,99 @@ He suggests testing, viz:
 So if the idea is that we use 3N in the main site and 1N in DR, we still need 3 machines (or whatever).
 
 I guess that makes the DR site 1/3, or a quarter overall.
+* Mon 23 Mar 12:12:24 GMT 2015
+** Sync with Nick
+Sync'd with Nick on wiki stuff.  He had unpushed code to do with
+Apache config, and when he pulled my changes had a bunch of stuff he
+needed to stash or commit.
+
+We looked into how to use ~git stash~ and ~git stash apply~ to stash
+and then generate a merge, which worked well.
+
+Nick has a lot of nasty sed in his cookbook, which we'll need to
+address, but it's a start.
+
+I started to show him my the ~.kitchen.yml~ changes, but we were
+seeing odd behaviour where the machines were asking for passwords.
+Simultaneously, SB and SJH complained that the HN seemed to be
+unavailable.
+** Broken Headnode
+Asked NT to raise a ticket with Joyent.  The machine was unresponsive
+to ssh, and when we consoled on, was still unresponsive.
+
+Nick tracked the incident:
+
+- https://gist.github.com/vxnick/2689992a98b126784aef
+- https://gist.github.com/vxnick/c91b0af65b686644911f
+
+Looked like a chassis issue.  We swapped the chassis out, and with
+Joyent's help, we changed the mac, and the new system is up.
+
+Joyent are doing some analysis to see what actually went wrong.
+** Meraki Call
+** Sentral Call
+** Hammer Procurement
+*** Switches
+- ~ 7
+- 
+** Fahy Photo
+** Cyrus One Call
+*** External BW
+- 400 commit
+*** Space
+- 10 - 12 - 14
+- 10 static
+- 15 static
+*** Power
+- Happy with power
+- whips --> 1 time power within cost; non-recurring
+- spec what we need; ask for recommendation.
+*** Cross Connect
+- Term from external
+- IX cross nic
+*** 2 Facilities
+- Carrolton
+- Houston... 
+-- talk to Chris re: .. size/speed
+- 6/7 primary
+- 10 ms
+- 10G quote prepared -- 
+- 1G to follow
+- maybe 10G/1G backup
+- 1g -> 10g 60 days upgrade time
+- 100% completely diverse
+- alphius
+- level 3
+
+|-----------------+-------------+-------------+-------------|
+|                 | DR1 (4-5-6) | DR2 (4 x 3) | DR3 (5 x 3) |
+|-----------------+-------------+-------------+-------------|
+| PRD1 (10 x 3)   |             |             |             |
+| PRD2 (10-12-14) |             |             |             |
+| PRD3 (15 x 3)   |             |             |             |
+|-----------------+-------------+-------------+-------------|
+
+
+** USA SMIC
+*** Compute Spec:
+- 2U 24 x 2.5" 920W (CSE-216BA-R920LPB)
+- SM X10DRi
+- 2 x E502690v3
+- 256GB DDR4
+- 2 x LSI 9207-8i HBA
+- 1 x X520-DA2
+- Rear 2 x 2.5" HDD kit (MCP-220-82609-0N)
+*** JBOD Spec
+- SM 4U 45* HSBay Red 1280w PSU + Rails (CSE-847E16-R1K28JBOD)
+*** 1U Storage Head
+- 1u SM 10* 2.5in HSBay Red 700w PSU + Rails (CSE-116TQ-R706WB)
+- SM X10DRW-i
+- Dual Intel E5-2603v2 (6*1.8Ghz/15MB/6.4GT's)
+- 256GB DDR4 2133 ECC REG (16*16GB)
+- LSI SAS 9207-8e (2* External Mini-SAS SFF8088)
+- Intel X540-T2 (Dual Port 10GbE RJ45)
+- 1 * SNK-P0047PSC & 1* SNK-P0057PS
+- Riser for 2* Expansion (RSC-R1UW-2E16)
+** Monit Work
+Handy link: 
+- http://hadzimahmutovic.com/monit-naemon/using-nagiosnaemon-monitoring-plugins-monit
