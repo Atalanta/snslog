@@ -1713,3 +1713,257 @@ Joyent are doing some analysis to see what actually went wrong.
 ** Monit Work
 Handy link: 
 - http://hadzimahmutovic.com/monit-naemon/using-nagiosnaemon-monitoring-plugins-monit
+* Tue 24 Mar 10:05:18 GMT 2015
+** Adding FiFo Hypervisors
+#+BEGIN_SRC 
+VERSION=rel
+cd /opt
+curl -O http://release.project-fifo.net/chunter/${VERSION}/chunter-latest.gz
+gunzip chunter-latest.gz
+sh chunter-latest
+svcadm enable epmd
+svcadm enable chunter
+#+END_SRC
+
+#+BEGIN_SRC 
+[root@0c-c4-7a-0f-aa-9a /opt]# dladm show-link 
+LINK        CLASS     MTU    STATE    BRIDGE     OVER
+e1000g0     phys      1500   down     --         --
+e1000g1     phys      1500   up       --         --
+ixgbe0      phys      1500   down     --         --
+ixgbe1      phys      1500   up       --         --
+[root@0c-c4-7a-0f-aa-9a /opt]# dladm show-phys -m
+LINK         SLOT     ADDRESS            INUSE CLIENT
+e1000g0      primary  c:c4:7a:f:aa:9b    yes  e1000g0
+e1000g1      primary  c:c4:7a:f:aa:9a    yes  e1000g1
+ixgbe0       primary  0:1b:21:9a:d0:38   yes  ixgbe0
+ixgbe1       primary  0:1b:21:9a:d0:39   yes  ixgbe1
+#+END_SRC
+
+Add ~external_nic=0:1b:21:9a:d0:39~ to ~/usbkey/config~
+
+Run ~sysinfo -u~
+
+#+BEGIN_SRC 
+[root@0c-c4-7a-0f-aa-9a /opt]# nictagadm list
+NAME           MACADDRESS         LINK           TYPE            
+external       00:1b:21:9a:d0:39  ixgbe1         normal          
+admin          0c:c4:7a:0f:aa:9a  e1000g1        normal
+#+END_SRC
+
+** Make LeoFS N=3
+
+On fifo and leo zones:
+
+#+BEGIN_SRC 
+svcadm disable leofs/manager
+svcadm disable leofs/storage
+svcadm disable leofs/gateway
+rm -rf /var/db/leo*
+#+END_SRC
+
+Edit ~/opt/local/leo_manager/etc/leo_manager.conf~ and set:
+
+#+BEGIN_SRC 
+fifo> grep consistency /opt/local/leo_manager/etc/leo_manager.conf
+##     * See: http://www.leofs.org/docs/configuration.html#the-consistency-level
+consistency.num_of_replicas = 3
+consistency.write = 2
+consistency.read = 2
+consistency.delete = 1
+consistency.rack_aware_replicas = 0
+fifo> 
+#+END_SRC
+
+Now start managers.
+
+Aha
+
+#+BEGIN_SRC 
+11:06 <Cope> leo> leofs-adm status
+11:06 <Cope> [ERROR] Mnesia is not available
+#+END_SRC
+
+Aha because I deleted all the things:
+
+#+BEGIN_SRC 
+USER=leofs
+GROUP=$USER
+COMPONENT=leo_manager
+mkdir -p /var/db/leofs
+chown -R $USER:$GROUP /var/db/leofs
+mkdir -p /var/db/$COMPONENT/mnesia
+mkdir -p /var/db/$COMPONENT/work
+mkdir -p /var/db/$COMPONENT/snmp
+chown -R $USER:$GROUP /var/db/$COMPONENT
+mkdir -p /var/log/$COMPONENT/sasl
+chown -R $USER:$GROUP /var/log/$COMPONENT 
+#+END_SRC
+
+#+BEGIN_SRC 
+leo> leofs-adm status
+ [System Confiuration]
+---------------------------------+----------
+ Item                            | Value    
+---------------------------------+----------
+ Basic/Consistency level
+---------------------------------+----------
+                  system version | 1.2.7
+                      cluster Id | leofs_1
+                           DC Id | dc_1
+                  Total replicas | 3
+        number of successes of R | 2
+        number of successes of W | 2
+        number of successes of D | 1
+ number of DC-awareness replicas | 0
+                       ring size | 2^128
+---------------------------------+----------
+ Multi DC replication settings
+---------------------------------+----------
+      max number of joinable DCs | 2
+         number of replicas a DC | 1
+---------------------------------+----------
+ Manager RING hash
+---------------------------------+----------
+               current ring-hash | 
+              previous ring-hash | 
+---------------------------------+----------
+#+END_SRC
+
+
+OK so to create a zone.
+
+First get the images:
+
+#+BEGIN_SRC 
+# imgadm update
+Added manifest info for image 5a4ba06a-c1bb-11e4-af0b-4be0ce4ce04c from "https://images.joyent.com"
+imgadm: warn: cannot determine original snapshot for image "5a4ba06a-c1bb-11e4-af0b-4be0ce4ce04c" (source info has no "dataset_guid")
+# imgadm import d34c301e-10c3-11e4-9b79-5f67ca448df0
+
+[root@0c-c4-7a-0f-aa-9a /opt]# vmadm list
+UUID                                  TYPE  RAM      STATE             ALIAS
+ff295131-b01a-47f0-8e25-e491a680e835  OS    1024     running           reginald
+625b9489-7743-4efd-95a8-bb2c8af04ad3  OS    3072     running           leo-storage-2
+#+END_SRC
+
+Next we need a config.json:
+
+#+BEGIN_SRC
+cd /opt
+cat <<EOF > leo-storage-3
+{
+ "autoboot": true,
+ "brand": "joyent",
+ "image_uuid": "d34c301e-10c3-11e4-9b79-5f67ca448df0",
+ "max_physical_memory": 3072,
+ "cpu_cap": 100,
+ "alias": "leo-storage-3",
+ "quota": "40",
+ "resolvers": [
+  "8.8.8.8",
+  "8.8.4.4"
+ ],
+ "nics": [
+  {
+   "interface": "net0",
+   "nic_tag": "admin",
+   "ip": "10.130.254.32",
+   "gateway": "10.130.254.254",
+   "netmask": "255.255.255.0"
+  }
+ ]
+}
+EOF
+#+END_SRC
+
+Now make the image:
+
+#+BEGIN_SRC 
+[root@0c-c4-7a-0f-ab-22 /opt]# vmadm create -f leo-storage-3 
+
+#+END_SRC
+
+
+
+# vmadm list
+UUID                                  TYPE  RAM      STATE             ALIAS
+ff295131-b01a-47f0-8e25-e491a680e835  OS    1024     running           reginald
+625b9489-7743-4efd-95a8-bb2c8af04ad3  OS    3072     running           leo-storage-2
+# zlogin 625b9489-7743-4efd-95a8-bb2c8af04ad3
+
+echo "http://release.project-fifo.net/pkg/rel/" >>/opt/local/etc/pkgin/repositories.conf
+pkgin install leo_manager leo_storage leo_gateway
+
+Edit ~/opt/local/leo_storage/etc/leo_storage.conf~
+
+#+BEGIN_SRC 
+managers = [manager_0@10.130.254.12, manager_1@10.130.254.11]
+#+END_SRC
+
+#+BEGIN_SRC 
+svcadm enable epmd
+svcadm enable leofs/storage
+#+END_SRC
+
+
+leo> leofs-adm start
+Generating RING...
+Generated RING
+OK  33% - storage_0@10.130.254.12
+OK  67% - storage_0@10.130.254.22
+OK 100% - storage_0@10.130.254.32
+OK
+leo> leofs-adm status
+ [System Confiuration]
+---------------------------------+----------
+ Item                            | Value    
+---------------------------------+----------
+ Basic/Consistency level
+---------------------------------+----------
+                  system version | 1.2.7
+                      cluster Id | leofs_1
+                           DC Id | dc_1
+                  Total replicas | 3
+        number of successes of R | 2
+        number of successes of W | 2
+        number of successes of D | 1
+ number of DC-awareness replicas | 0
+                       ring size | 2^128
+---------------------------------+----------
+ Multi DC replication settings
+---------------------------------+----------
+      max number of joinable DCs | 2
+         number of replicas a DC | 1
+---------------------------------+----------
+ Manager RING hash
+---------------------------------+----------
+               current ring-hash | e402d7ab
+              previous ring-hash | e402d7ab
+---------------------------------+----------
+
+ [State of Node(s)]
+-------+------------------------------+--------------+----------------+----------------+----------------------------
+ type  |             node             |    state     |  current ring  |   prev ring    |          updated at         
+-------+------------------------------+--------------+----------------+----------------+----------------------------
+  S    | storage_0@10.130.254.12      | running      | e402d7ab       | e402d7ab       | 2015-03-24 12:23:26 +0000
+  S    | storage_0@10.130.254.22      | running      | e402d7ab       | e402d7ab       | 2015-03-24 12:23:27 +0000
+  S    | storage_0@10.130.254.32      | running      | e402d7ab       | e402d7ab       | 2015-03-24 12:23:27 +0000
+  G    | gateway_0@10.130.254.12      | running      | e402d7ab       | e402d7ab       | 2015-03-24 12:23:28 +0000
+-------+------------------------------+--------------+----------------+----------------+----------------------------
+** Creating a Fifo Cluster
+NB cluster means 2 things... we don't mean cluster at the level of riak / leo.
+
+#+BEGIN_SRC 
+fifo> sniffle-admin vms init-cluster 75129287-0032-45f3-892a-9639cebd1574 FiFo
+VM 75129287-0032-45f3-892a-9639cebd1574 added to new cluster ede671d0-8696-4eac-be04-83753fbf76fa.
+
+#+END_SRC
+
+*** Questions for Heinz
+- Should we run the leo storage nodes on a different network?
+- What is this: ~imgadm: warn: cannot determine original snapshot for image "5a4ba06a-c1bb-11e4-af0b-4be0ce4ce04c" (source info has no "dataset_guid")~
+- Does sniffle-admin vms init-cluster take a list?
+- Why is there no help for sniffle-admin vms init-cluster?
+- How do I change the name of a vm?
+** CyrusOne Call
