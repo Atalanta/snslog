@@ -3,6 +3,10 @@
 - 1 month induction for bs
 - replace shure headphoe
 * Projects
+** Joy ETTA
+- DOB:29/10/49
+- Phone: 01329 832339
+ - TTE: 01908 208898
 ** Update http testing wiki
 - http://www.the-art-of-web.com/system/telnet-http11/
 ** Evaluate Lastpass
@@ -17,3 +21,7 @@
 - Nathen asked me
 - Jen Burke to organize
 * Next Actions
+** Phone
+- TTE:  01908 208898
+** Follow Up
+*** Elaine / Baldwin re: tables
