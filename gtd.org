@@ -20,6 +20,7 @@
 ** TODO Book Signing at Chef Conf
 - Nathen asked me
 - Jen Burke to organize
+** Fix SmartOS
 * Next Actions
 ** Phone
 - TTE:  01908 208898
