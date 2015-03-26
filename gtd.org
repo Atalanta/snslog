@@ -17,6 +17,7 @@
 - http://www.bsdnow.tv/tutorials/openbsd-router
 - http://home.nuug.no/~peter/pf/newest/
 - http://www.bsdnow.tv/tutorials/openbsd-router
+** DNS Migration
 ** TODO Book Signing at Chef Conf
 - Nathen asked me
 - Jen Burke to organize
@@ -25,4 +26,8 @@
 ** Phone
 - TTE:  01908 208898
 ** Follow Up
-*** Elaine / Baldwin re: tables
+*** DONE Elaine / Baldwin re: tables
+*** Hammer Chris: Mellanox contact
+*** Hammer Chris: Mellanox demo units
+*** Hammer Chris: Mellanox hybrid cable prices
+*** Brocade: Demo Units

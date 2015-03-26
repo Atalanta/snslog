@@ -216,7 +216,7 @@ e5 3.4 procesors
 reads - memory... good
 fifo contains monitoring
 rest by zabbix
-ZFS send is 100MB/s
+ZFS se#nd is 100MB/s
 concat witg gzip -1
 sweet spot...
 50GB....
@@ -1967,3 +1967,136 @@ VM 75129287-0032-45f3-892a-9639cebd1574 added to new cluster ede671d0-8696-4eac-
 - Why is there no help for sniffle-admin vms init-cluster?
 - How do I change the name of a vm?
 ** CyrusOne Call
+* Wed 25 Mar 09:41:27 GMT 2015
+** Email Review
+- Novatech Conact in lieu of David: Chris Marrriot: 02392 322 537
+- CPC Login:
+#+BEGIN_EXAMPLE
+username: davidyoungs
+pass: dy2002lyc
+#+END_EXAMPLE
+- David Visa: 8165/459 (photo) 
+
+** DNS Plan
+** Wireless
+* Thu 26 Mar 08:56:38 GMT 2015
+** Mellanox Call with Chris from Hammer
+2 devices proposed:
+
+- 1036B
+- 1012
+
+Asked if they can be deployed in an 'end of rack' configuration, or in
+a 'mesh'.  These don't have 'stacking ports', and are 100% optical.
+He did indicate it might be possible to run copper with SFP
+convertors, if that was a consideration.
+
+The 1036 is a 36 port 40GB switch which be used for the 'spine', with TOR
+1012s. The 1012 is a half-width switch with 40G ports which can be
+broken into 4 10G switches using a hybrid QSFP -> 4 x SFP cable.
+
+A consideration is that these can only run up to a maximum of 5M.  We
+don't have a price for these cables yet.
+
+The 1036 (and presumably the 1012) supports MLAG (which is good if we
+want to avoid spanning tree).
+
+The pricing which came through was $25000 for the two 1036 units, and
+then utilizing a special bundle price for the 1012s - 5600 for a
+switch and kit, with the option to add a second switch for a bit less.
+In total on capex this looks like being about $61K.
+
+I explained that we're comparing the Brocade 6970 and 6740.  The
+former being a 40G switch, the latter a 10G.  We'd go for a 100%
+copper solution with these.  Chris suggested setting up a call with a
+tech-presales droid at Mellanox.  I agreed this was probably
+worthwhile.  He also suggested he might be able to get us a demo model
+(possibly to Texas).
+
+With that in mind I've asked Brocade if they can do the same.
+
+Follow up:
+
+- Mellanox dude contact
+- Demo Units
+- Prices for hybrid cables
+
+** 6 and 8TB disk tests
+Let's have a look at 10.130.254.30:
+
+
+$ ssh 10.130.254.30 -l root
+Password: 
+Last login: Tue Mar 24 12:16:06 2015 from 192.168.128.9
+- SmartOS Live Image v0.147+ build: 20150306T202346Z
+
+[root@0c-c4-7a-0f-ab-22 ~]# zpool create disktest mirror c0t50014EE260799002d0 c0t50014EE26098507Cd0 c0t50014EE2609631BBd0 c0t50014EE2607943CAd0
+
+# zpool status zones
+  pool: zones
+ state: ONLINE
+  scan: none requested
+config: 
+
+        NAME                     STATE     READ WRITE CKSUM
+        zones                    ONLINE       0     0     0
+          c0t50014EE20B0459ADd0  ONLINE       0     0     0
+
+errors: No known data errors
+
+[root@0c-c4-7a-0f-ab-22 ~]# zpool attach zones c0t50014EE20B0459ADd0 c0t50014EE20B5643A8d0
+
+
+
+
+[root@0c-c4-7a-0f-ab-22 ~]# echo | format | grep c0t50014EE20B0459ADd0
+      19. c0t50014EE20B0459ADd0 <ATA-WDC WD60EZRX-00M-0A80-5.46TB>
+
+# zpool add -n zones mirrcor c0t50014EE2B5CF1A80d0 c0t50014EE2B5D0BE74d0
+would update 'zones' to the following configuration:
+        zones
+          mirror
+            c0t50014EE20B0459ADd0
+            c0t50014EE20B5643A8d0
+          mirror
+            c0t50014EE2B5CF1A80d0
+            c0t50014EE2B5D0BE74d0
+
+
+# zpool status zones
+  pool: zones
+ state: ONLINE
+  scan: resilvered 4.96G in 0h0m with 0 errors on Thu Mar 26 09:29:21 2015
+config:
+
+        NAME                       STATE     READ WRITE CKSUM
+        zones                      ONLINE       0     0     0
+          mirror-0                 ONLINE       0     0     0
+            c0t50014EE20B0459ADd0  ONLINE       0     0     0
+            c0t50014EE20B5643A8d0  ONLINE       0     0     0
+          mirror-1                 ONLINE       0     0     0
+            c0t50014EE2B5CF1A80d0  ONLINE       0     0     0
+            c0t50014EE2B5D0BE74d0  ONLINE       0     0     0
+
+errors: No known data errors
+
+
+Keep in mind you're adding a new vdev which may have a different ashift than the already 
+                existing mirror, so if you prefer to manually set an ashift you should use "zpool add -n 
+                -o ashift=X zones mirror disk1 disk2", with X being 9 for 512 byte sectors or 12 for 4096
+
+
+*** Tests to do:
+
+Insert jpegs?
+Resilver?
+** DNS!!!
+** Sentral Order
+*** Firewall
+*** Compute
+- 2 x CN
+- 60 x SSD
+*** Storage
+- 3 x AIC 60 drives (1 for havant)
+- 3 x JBOD (1 for havant)
+- 
