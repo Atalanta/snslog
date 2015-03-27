@@ -2100,3 +2100,15 @@ Resilver?
 - 3 x AIC 60 drives (1 for havant)
 - 3 x JBOD (1 for havant)
 - 
+* Fri 27 Mar 15:16:42 GMT 2015
+** Brocade Loan
+Carrollton
+Carrollton
+
+CyrusOne c/o LiveLink Technologies
+
+1649 West Frankford Road
+
+Carrollton, TX 75007
+
+DH6
