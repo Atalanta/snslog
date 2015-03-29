@@ -2112,3 +2112,64 @@ CyrusOne c/o LiveLink Technologies
 Carrollton, TX 75007
 
 DH6
+* Sun Mar 29 19:41:19 BST 2015
+** Packing List
+- [ ] Passport
+- [ ] ESTA
+- [ ] Printout of Destination
+- [ ] Printout of Conference
+- [ ] Clean Handkerchief
+- [ ] Rollet
+- [ ] Space Pen
+- [ ] Screwdriver & Tool Singly (in big bag)
+- [ ] Kindly
+- [ ] Kindly Rire
+- [ ] Telephone
+- [ ] Telephone Rire
+- [ ] Earphones
+- [ ] Offline Mugate
+- [ ] American Phone
+- [ ] American Rire
+- [ ] Study Books
+  + [ ] Erlang
+  + [ ] Performance
+- [ ] Yellow Puter
+- [ ] Yellow Puter Rire
+- [ ] USA Plug Adaptors
+- [ ] Apple Adaptor Kit
+- [ ] Aeroplane Adaptor Kit
+- [ ] Study Notebook
+- [ ] Red pen
+- [ ] Squishy ruler
+- [ ] VGA, DVI, other singly convertors
+- [ ] Travelly
+- [ ] Yoga Mat
+- [ ] Cushion
+- [ ] Malas etc
+- [ ] Dadramas
+- [ ] Yoga shorts
+- [ ] Yoga trousers
+- [ ] Short-sleeved dragonfly top
+- [ ] Long-sleeved dragonfly top
+- [ ] Trainers
+- [ ] Hoody
+- [ ] Washbag
+  + [ ] Toothpaste
+  + [ ] Electric Toothbrush
+  + [ ] Electric Toothbrush Rire
+  + [ ] Razor
+  + [ ] Undyarmdeodeant
+  + [ ] Mensuns
+    + [ ] Flowers
+    + [ ] Echinacea
+    + [ ] Bitman Mix
+    + [ ] Bitamin B12
+    + [ ] Headache Mensuns
+- [ ] Spare Specs
+- [ ] Lipsowve
+- [ ] Handcream
+- [ ] 3 shirts
+- [ ] 3 pants
+- [ ] 3 gocka
+- [ ] Suit
+- [ ] Shoes
