@@ -2121,23 +2121,23 @@ DH6
 - [ ] Clean Handkerchief
 - [ ] Rollet
 - [ ] Space Pen
-- [ ] Screwdriver & Tool Singly (in big bag)
-- [ ] Kindly
-- [ ] Kindly Rire
+- [X] Screwdriver & Tool Singly (in big bag)
+- [X] Kindly
+- [X] Kindly Rire
 - [ ] Telephone
 - [ ] Telephone Rire
 - [ ] Earphones
 - [ ] Offline Mugate
-- [ ] American Phone
+- [X] American Phone
 - [ ] American Rire
-- [ ] Study Books
-  + [ ] Erlang
-  + [ ] Performance
+- [X] Study Books
+  + [X] Erlang
+  + [X] Performance
 - [ ] Yellow Puter
 - [ ] Yellow Puter Rire
-- [ ] USA Plug Adaptors
+- [X] USA Plug Adaptors
 - [ ] Apple Adaptor Kit
-- [ ] Aeroplane Adaptor Kit
+- [X] Aeroplane Adaptor Kit
 - [ ] Study Notebook
 - [ ] Red pen
 - [ ] Squishy ruler
@@ -2145,7 +2145,7 @@ DH6
 - [ ] Travelly
 - [ ] Yoga Mat
 - [ ] Cushion
-- [ ] Malas etc
+- [X] Malas etc
 - [ ] Dadramas
 - [ ] Yoga shorts
 - [ ] Yoga trousers
@@ -2173,3 +2173,62 @@ DH6
 - [ ] 3 gocka
 - [ ] Suit
 - [ ] Shoes
+- [X] Passport
+- [X] ESTA
+- [X] Printout of Destination
+- [X] Printout of Conference
+- [X] Clean Handkerchief
+- [X] Rollet
+- [X] Space Pen
+- [X] Screwdriver & Tool Singly (in big bag)
+- [X] Kindly
+- [X] Kindly Rire
+- [X] Telephone
+- [X] Telephone Rire
+- [X] Earphones
+- [X] Offline Mugate
+- [X] American Phone
+- [X] American Rire
+- [X] Study Books
+  + [X] Erlang
+  + [X] Performance
+- [X] Yellow Puter
+- [X] Yellow Puter Rire
+- [X] USA Plug Adaptors
+- [ ] Apple Adaptor Kit
+- [X] Aeroplane Adaptor Kit
+- [X] Study Notebook
+- [X] Red pen
+- [X] Squishy ruler
+- [X] VGA, DVI, other singly convertors
+- [X] Travelly
+- [X] Yoga Mat
+- [X] Cushion
+- [X] Malas etc
+- [X] Dadramas
+- [X] Yoga shorts
+- [X] Yoga trousers
+- [X] Short-sleeved dragonfly top
+- [X] Long-sleeved dragonfly top
+- [X] Trainers
+- [X] Hoody
+- [X] Washbag
+  + [X] Toothpaste
+  + [X] Electric Toothbrush
+  + [X] Electric Toothbrush Rire
+  + [X] Razor
+  + [X] Undyarmdeodeant
+  + [X] Mensuns
+    + [X] Flowers
+    + [X] Echinacea
+    + [X] Bitman Mix
+    + [X] Bitamin B12
+    + [X] Headache Mensuns
+- [X] Spare Specs
+- [X] Lipsowve
+- [X] Handcream
+- [X] 3 shirts
+- [X] 3 pants
+- [X] 3 gocka
+- [X] Suit
+- [X] Shoes
